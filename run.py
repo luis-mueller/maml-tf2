@@ -1,10 +1,6 @@
 import tensorflow as tf
-import tensorflowjs as tfjs
-
-from tasks import SinusoidRegressionTaskDistribution
-from maml import RegressionMAML
+from mamltf2 import RegressionMAML, SinusoidRegressionTaskDistribution
 import argparse
-
 
 def main(name, nBatch, nTasks, nSamples, nEpochs, useLargerNetwork):
     metaModel = tf.keras.models.Sequential([

@@ -1,5 +1,5 @@
 import tensorflow as tf
-from tftools import TensorflowTools
+from mamltf2.tftools import TensorflowTools
 
 
 class RegressionMAML:

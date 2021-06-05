@@ -3,9 +3,7 @@ import tensorflowjs as tfjs
 import matplotlib.pyplot as plt
 import argparse
 
-from maml import RegressionMAML
-from tasks import SinusoidRegressionTaskDistribution
-
+from mamltf2 import RegressionMAML, SinusoidRegressionTaskDistribution
 
 def main(name, gradientSteps, nSamples, sampleLower, sampleUpper):
     taskDistribution = SinusoidRegressionTaskDistribution()
