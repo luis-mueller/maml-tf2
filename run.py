@@ -29,8 +29,8 @@ def main(name, nBatch, nTasks, nSamples, nEpochs, useLargerNetwork):
         )
 
         # Last log is the final model so just drop the epoch
-        tfjs.converters.save_keras_model(
-            metaModel, './models/' + name + ('_epoch_' + str(epoch) if epoch < nEpochs - 1 else ''))
+        modelPath = './models/' + name + ('_epoch_' + str(epoch) if epoch < nEpochs - 1 else '')
+        maml.saveKeras(modelPath)
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="""Tensorflow 2 implementation of Finn et al. 2017 (MAML) run file. 

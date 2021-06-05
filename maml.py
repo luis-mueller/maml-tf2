@@ -4,8 +4,8 @@ from tftools import TensorflowTools
 
 class RegressionMAML:
     def __init__(self, model, taskDistribution, metaLearningRate=0.001):
-        self.metaModel = model
-        self.weights = model.trainable_variables
+        self.metaModel = TensorflowTools.loadModelFromContext(model)
+        self.weights = self.metaModel.trainable_variables
         self.taskDistribution = taskDistribution
 
         self.metaOptimizer = tf.keras.optimizers.Adam(metaLearningRate)
@@ -21,6 +21,9 @@ class RegressionMAML:
             tf.keras.optimizers.SGD(0.01).apply_gradients(
                 zip(grads, clone.trainable_weights))
         return clone
+    
+    def saveKeras(self, path):
+        TensorflowTools.saveKeras(self.metaModel, path)
 
     @tf.function
     def step(self, grads, x):

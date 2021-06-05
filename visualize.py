@@ -10,9 +10,7 @@ from tasks import SinusoidRegressionTaskDistribution
 def main(name, gradientSteps, nSamples, sampleLower, sampleUpper):
     taskDistribution = SinusoidRegressionTaskDistribution()
 
-    model = tfjs.converters.load_keras_model(
-        './models/' + name + '/model.json')
-    maml = RegressionMAML(model, taskDistribution)
+    maml = RegressionMAML('./models/' + name + '/model.json', taskDistribution)
 
     task = taskDistribution.sampleTask()
     ys, xs = task.sampleFromTask(nSamples, sampleLower, sampleUpper)
