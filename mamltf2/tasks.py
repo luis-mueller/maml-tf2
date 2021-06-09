@@ -26,12 +26,14 @@ class SinusoidRegressionTaskDistribution:
         u = tf.random.uniform((nSamples, nTasks), -5.0, 5.0)
         return tf.transpose(A * tf.sin(t - p)), tf.transpose(t), tf.transpose(A * tf.sin(u - p)), tf.transpose(u)
 
-    def sampleTaskBatches(self, nSamples, nTasks, nBatch):
+    def sampleTaskBatches(self, nSamples, nTasks, nBatch, alsoSampleTest = True):
         A = tf.random.uniform((nTasks, 1), 0.1, 5.0)
         p = tf.random.uniform((nTasks, 1), 0, np.pi)
         t = tf.random.uniform((nBatch, nTasks, nSamples), -5.0, 5.0)
-        u = tf.random.uniform((nBatch, nTasks, nSamples), -5.0, 5.0)
-        return A * tf.sin(t - p), t, A * tf.sin(u - p), u
+        if alsoSampleTest:
+            u = tf.random.uniform((nBatch, nTasks, nSamples), -5.0, 5.0)
+            return A * tf.sin(t - p), t, A * tf.sin(u - p), u
+        return A * tf.sin(t - p), t
 
 
 

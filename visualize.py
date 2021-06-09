@@ -3,12 +3,16 @@ import tensorflowjs as tfjs
 import matplotlib.pyplot as plt
 import argparse
 
-from mamltf2 import RegressionMAML, SinusoidRegressionTaskDistribution
+from mamltf2 import RegressionMAML, PretrainedModel, SinusoidRegressionTaskDistribution
 
-def main(name, gradientSteps, nSamples, sampleLower, sampleUpper):
+def main(name, method, gradientSteps, nSamples, sampleLower, sampleUpper):
     taskDistribution = SinusoidRegressionTaskDistribution()
 
-    maml = RegressionMAML('./models/' + name + '/model.json', taskDistribution)
+    modelPath = './models/' + name + '/model.json'
+    if method == 'maml':
+        metaModel = RegressionMAML(modelPath, taskDistribution)
+    elif method == 'pretrained':
+        metaModel = PretrainedModel(modelPath, taskDistribution)
 
     task = taskDistribution.sampleTask()
     ys, xs = task.sampleFromTask(nSamples, sampleLower, sampleUpper)
@@ -20,9 +24,9 @@ def main(name, gradientSteps, nSamples, sampleLower, sampleUpper):
     plt.plot(x, task(x), label="True sine")
 
     for nSteps in ([0] + gradientSteps if not 0 in gradientSteps else gradientSteps):
-        prediction = maml.steps(ys, xs, nSteps)(x)
+        prediction = metaModel.steps(ys, xs, nSteps)(x)
         print('Mean squared error from -5 to 5 with %d steps: %.4f' %
-              (nSteps, maml.mse(task(x), prediction)))
+              (nSteps, metaModel.mse(task(x), prediction)))
         plt.plot(x, prediction, label='%d gradient steps' % nSteps)
 
     plt.scatter(xs, ys)
@@ -37,6 +41,9 @@ if __name__ == "__main__":
     The results are compared, 0 gradient steps is always included but you can savely add it to the list, if you want.""")
     parser.add_argument('name', metavar='name', type=str, nargs=1,
                         help='The model you want to load from models/name/...')
+
+    parser.add_argument('method', type=str, default="maml", nargs=1,
+                        help="""Name of the method you want to apply. Supported are 'pretrained' and 'maml'.""")
 
     parser.add_argument('gradsteps', default=[1], type=int, nargs='*',
                         help='A list of numbers of gradient steps that should be compared')
@@ -53,5 +60,5 @@ if __name__ == "__main__":
                         structure even for areas where no samples exist.""")
 
     args = parser.parse_args()
-    main(args.name[0], args.gradsteps, args.samples,
+    main(args.name[0], args.method[0], args.gradsteps, args.samples,
          args.sample_lower, args.sample_upper)
