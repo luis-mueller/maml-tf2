@@ -1,68 +1,46 @@
 import tensorflow as tf
-from mamltf2.tftools import TensorflowTools
+from mamltf2.model import Model
 
 
-class RegressionMAML:
-    def __init__(self, model, taskDistribution, metaLearningRate=0.001):
-        self.metaModel = TensorflowTools.loadModelFromContext(model)
-        self.weights = self.metaModel.trainable_variables
-        self.taskDistribution = taskDistribution
-
-        self.metaOptimizer = tf.keras.optimizers.Adam(metaLearningRate)
-        self.mse = tf.keras.losses.MeanSquaredError()
-
-    def steps(self, y, x, nSteps=1):
-        clone = TensorflowTools.deepCloneModel(self.metaModel)
-        for _ in range(nSteps):
-            with tf.GradientTape() as taskTape:
-                loss = self.mse(y, clone(x))
-
-            grads = taskTape.gradient(loss, clone.trainable_weights)
-            tf.keras.optimizers.SGD(0.01).apply_gradients(
-                zip(grads, clone.trainable_weights))
-        return clone
-    
-    def saveKeras(self, path):
-        TensorflowTools.saveKeras(self.metaModel, path)
-
+class RegressionMAML(Model):
     @tf.function
     def step(self, grads, x):
+        """'Fast weights': Implements a single SGD step on the current meta model with a fixed step-size. It seems that tensorflow 
+        is not able to differentiate through an optimizer's steps, hence this implementation. In the meta-validation step this can 
+        be replaced by a proper tf.keras.optimizers.SGD instance.
+        """
         k = 0
         y = tf.reshape(x, (-1, 1))
-        for j in range(len(self.metaModel.layers)):
-            kernel = self.metaModel.layers[j].kernel - 0.01 * grads[k]
-            bias = self.metaModel.layers[j].bias - 0.01 * grads[k+1]
-            y = self.metaModel.layers[j].activation(y @ kernel + bias)
+        for j in range(len(self.model.layers)):
+            kernel = self.model.layers[j].kernel - 0.01 * grads[k]
+            bias = self.model.layers[j].bias - 0.01 * grads[k+1]
+            y = self.model.layers[j].activation(y @ kernel + bias)
             k += 2
         return y
 
     @tf.function
-    def loss(self, y_train, x_train, y_test, x_test):
-        def taskLoss(batch):
-            ya, xa, yb, xb = batch
-            with tf.GradientTape() as taskTape:
-                loss = self.mse(ya, self.metaModel(tf.reshape(xa, (-1, 1))))
+    def taskLoss(self, batch):
+        """Computes the loss for one task given one batch of inputs and correspondings labels
+        """
+        y_train, x_train, y_test, x_test = batch
 
-            grads = taskTape.gradient(loss, self.weights)
-            return (self.mse(yb, self.step(grads, xb)), 0, 0, 0)
+        with tf.GradientTape() as taskTape:
+            loss = self.mse(y_train, self.model(
+                tf.reshape(x_train, (-1, 1))))
 
+        grads = taskTape.gradient(loss, self.weights)
+        return self.mse(y_test, self.step(grads, x_test))
+
+    @tf.function
+    def update(self, batch):
+        """Implements the meta-update step for a bunch of tasks.
+
+        @batch: Tuple of training and test data for the update step. Can be directly passed through to 
+        the task updates.
+        """
         with tf.GradientTape() as metaTape:
-            batch = (y_train, x_train, y_test, x_test)
-            losses, _, _, _ = tf.map_fn(taskLoss, elems=batch)
-            loss = tf.reduce_sum(losses)
+            loss = tf.reduce_sum(
+                tf.map_fn(self.taskLoss, elems=batch, fn_output_signature=tf.float32))
 
-        grads = metaTape.gradient(loss, self.weights)
-        self.metaOptimizer.apply_gradients(zip(grads, self.weights))
+        self.optimizer.minimize(loss, self.weights, tape=metaTape)
         return loss
-
-    def trainBatch(self, nSamples, nTasks, nBatch):
-        def metaLoss(batch):
-            return (self.loss(*batch), 0, 0, 0)
-
-        batch = self.taskDistribution.sampleTaskBatches(
-            nSamples, nTasks, nBatch)
-
-        losses, _, _, _ = tf.map_fn(metaLoss, elems=batch)
-
-        return float(tf.reduce_mean(losses / nTasks))
-        
