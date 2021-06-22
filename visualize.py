@@ -13,6 +13,8 @@ def main(name, method, gradientSteps, nSamples, sampleLower, sampleUpper):
         metaModel = RegressionMAML(modelPath, taskDistribution)
     elif method == 'pretrained':
         metaModel = PretrainedModel(modelPath, taskDistribution)
+    else:
+        raise ValueError('Method %s is not supported' % method)
 
     task = taskDistribution.sampleTask()
     ys, xs = task.sampleFromTask(nSamples, sampleLower, sampleUpper)
