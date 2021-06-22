@@ -1,6 +1,7 @@
+from mamltf2.optimizer import FastWeights
 import tensorflow as tf
 from mamltf2.tftools import TensorflowTools
-
+from mamltf2.optimizer import FastWeights
 
 class Model:
     def __init__(self, model, taskDistribution, learningRate=0.001):
@@ -11,6 +12,7 @@ class Model:
         self.taskDistribution = taskDistribution
 
         self.optimizer = tf.keras.optimizers.Adam(learningRate)
+        self.fastWeights = FastWeights(self.model, 0.01)
         self.mse = tf.keras.losses.MeanSquaredError()
 
     def saveKeras(self, path):
