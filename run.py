@@ -1,5 +1,5 @@
 import tensorflow as tf
-from mamltf2 import RegressionMAML, PretrainedModel, SinusoidRegressionTaskDistribution
+from mamltf2 import RegressionMAML, RegressionFirstOrderMAML, RegressionReptile, PretrainedModel, SinusoidRegressionTaskDistribution
 import argparse
 
 
@@ -18,6 +18,10 @@ def main(name, method, nBatch, nTasks, nSamples, nEpochs, useLargerNetwork, save
 
     if method == 'maml':
         metaModel = RegressionMAML(model, taskDistribution)
+    elif method =='fomaml':
+        metaModel = RegressionFirstOrderMAML(model, taskDistribution)
+    elif method == 'reptile':
+        metaModel = RegressionReptile(model, taskDistribution)
     elif method == 'pretrained':
         metaModel = PretrainedModel(model, taskDistribution)
     else:

@@ -1,3 +1,5 @@
-from mamltf2.maml import RegressionMAML
+from mamltf2.methods.maml import RegressionMAML
+from mamltf2.methods.fomaml import RegressionFirstOrderMAML
+from mamltf2.methods.reptile import RegressionReptile
 from mamltf2.pretrained import PretrainedModel
 from mamltf2.tasks import SinusoidRegressionTaskDistribution

@@ -12,6 +12,7 @@ class Model:
         self.taskDistribution = taskDistribution
 
         self.optimizer = tf.keras.optimizers.Adam(learningRate)
+        self.sgd = tf.keras.optimizers.SGD(learningRate)
         self.fastWeights = FastWeights(self.model, 0.01)
         self.mse = tf.keras.losses.MeanSquaredError()
 
