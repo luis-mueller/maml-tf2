@@ -1,5 +1,7 @@
 import numpy as np
 import tensorflow as tf
+from functools import partial
+
 
 class SinusoidRegressionTask:
     def __init__(self, amplitude, phase):
@@ -14,9 +16,15 @@ class SinusoidRegressionTask:
         return self.amplitude * np.sin(t - self.phase)
 
 class SinusoidRegressionTaskDistribution:
+    def __init__(self,
+        amplitudeDistribution=partial(tf.random.uniform, minval=0.1, maxval=5.0),
+        phaseDistribution=partial(tf.random.uniform, minval=0, maxval=np.pi)):
+        self.amplitudeDistribution = amplitudeDistribution
+        self.phaseDistribution = phaseDistribution
+
     def sampleTask(self):
-        A = tf.random.uniform((1,), 0.1, 5.0)
-        p = tf.random.uniform((1,), 0, np.pi)
+        A = self.amplitudeDistribution((1,))
+        p = self.phaseDistribution((1,))
         return SinusoidRegressionTask(A, p)
 
     def sampleTaskBatches(self, nSamples, nTasks, nBatch, sampleLower = -5.0, sampleUpper = 5.0, alsoSampleTest = True):
