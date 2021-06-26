@@ -16,20 +16,6 @@ class FastWeights:
         """Compute fast weights and apply them for a forward pass. It seems that tensorflow 
         is not able to differentiate through an optimizer's steps, hence this implementation. In the meta-validation step this can 
         be replaced by a proper tf.keras.optimizers.SGD instance.
-        
-        k = 0
-        output = tf.reshape(input, (-1, 1))
-        for j in range(len(self.model.layers)):
-            kernel = self.model.layers[j].kernel
-            bias = self.model.layers[j].bias
-
-            for _ in range(nSteps):
-                kernel = kernel - self.lr * grads[k]
-                bias = bias - self.lr * grads[k+1]
-
-            output = self.model.layers[j].activation(output @ kernel + bias)
-            k += 2
-        return output
         """
         output = tf.reshape(input, (-1, 1))
         for j in range(len(self.model.layers)):
@@ -49,15 +35,14 @@ class FastWeights:
         """Apply a set of weights to the model, layer by layer.
         """
         for j in range(len(self.model.trainable_weights)):
-            
             self.model.trainable_weights[j].assign(weights[j])
 
     @tf.function
     def __computeKernelAndBias(self, layerIndex, grads, nSteps):
         """Computes fast weights for a number of steps for one layer.
         """
-        kernel = self.model.trainable_weights[layerIndex * 2]#self.model.layers[layerIndex].kernel
-        bias = self.model.trainable_weights[layerIndex * 2 + 1]#self.model.layers[layerIndex].bias
+        kernel = self.model.trainable_weights[layerIndex * 2]
+        bias = self.model.trainable_weights[layerIndex * 2 + 1]
 
         for _ in range(nSteps):
             kernel = kernel - self.lr * grads[layerIndex * 2]

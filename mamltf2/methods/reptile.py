@@ -14,9 +14,7 @@ class RegressionReptile(Model):
                 tf.reshape(x_train, (-1, 1))))
 
         grads = taskTape.gradient(loss, self.model.trainable_weights)
-
         fastWeights = self.fastWeights.compute(grads, nSteps=1)
-
         self.fastWeights.apply([weights + self.outerLearningRate * (fastWeights[i] - weights)
                                 for (i, weights) in enumerate(self.model.trainable_weights)])
 
@@ -33,5 +31,4 @@ class RegressionReptile(Model):
             tf.map_fn(self.taskLoss, elems=batch, fn_output_signature=tf.float32))
 
     def trainBatch(self, nSamples, nTasks, nBatch):
-        #return np.sum([ super().trainBatch(nSamples, 1, nBatch, alsoSampleTest=False) for _ in range(nTasks)])
         return super().trainBatch(nSamples, nTasks, nBatch, alsoSampleTest=False)
