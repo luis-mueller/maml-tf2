@@ -1,9 +1,8 @@
 import tensorflow as tf
-import tensorflowjs as tfjs
 import matplotlib.pyplot as plt
 import argparse
 
-from mamltf2 import RegressionMAML, PretrainedModel, SinusoidRegressionTaskDistribution
+from mamltf2 import RegressionMAML, RegressionFirstOrderMAML, RegressionReptile, PretrainedModel, SinusoidRegressionTaskDistribution
 
 def main(name, method, gradientSteps, nSamples, sampleLower, sampleUpper):
     taskDistribution = SinusoidRegressionTaskDistribution()
@@ -11,6 +10,10 @@ def main(name, method, gradientSteps, nSamples, sampleLower, sampleUpper):
     modelPath = './models/' + name + '/model.json'
     if method == 'maml':
         metaModel = RegressionMAML(modelPath, taskDistribution)
+    elif method =='fomaml':
+        metaModel = RegressionFirstOrderMAML(modelPath, taskDistribution)
+    elif method == 'reptile':
+        metaModel = RegressionReptile(modelPath, taskDistribution)
     elif method == 'pretrained':
         metaModel = PretrainedModel(modelPath, taskDistribution)
     else:
@@ -33,6 +36,7 @@ def main(name, method, gradientSteps, nSamples, sampleLower, sampleUpper):
 
     plt.scatter(xs, ys)
     plt.title('Comparing gradient steps for model ' + name)
+    plt.ylim([-5, 5])
     plt.legend()
     plt.show()
 

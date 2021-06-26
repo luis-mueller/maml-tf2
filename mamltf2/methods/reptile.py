@@ -1,12 +1,7 @@
 import tensorflow as tf
 from mamltf2.model import Model
-from mamltf2.tftools import TensorflowTools
-
 
 class RegressionReptile(Model):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.weights = self.model.get_weights()
 
     @tf.function
     def taskLoss(self, batch):
@@ -19,11 +14,12 @@ class RegressionReptile(Model):
                 tf.reshape(x_train, (-1, 1))))
 
         grads = taskTape.gradient(loss, self.model.trainable_weights)
-        fastWeights = self.fastWeights.compute(grads)
 
-        self.fastWeights.apply([weights + 0.1 * (fastWeights[i] - weights)
+        fastWeights = self.fastWeights.compute(grads, nSteps=1)
+
+        self.fastWeights.apply([weights + self.outerLearningRate * (fastWeights[i] - weights)
                                 for (i, weights) in enumerate(self.model.trainable_weights)])
-        
+
         return loss
 
     @tf.function
@@ -37,4 +33,5 @@ class RegressionReptile(Model):
             tf.map_fn(self.taskLoss, elems=batch, fn_output_signature=tf.float32))
 
     def trainBatch(self, nSamples, nTasks, nBatch):
+        #return np.sum([ super().trainBatch(nSamples, 1, nBatch, alsoSampleTest=False) for _ in range(nTasks)])
         return super().trainBatch(nSamples, nTasks, nBatch, alsoSampleTest=False)

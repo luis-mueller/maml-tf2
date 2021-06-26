@@ -37,24 +37,27 @@ class FastWeights:
             output = self.model.layers[j].activation(output @ kernel + bias)
         return output
 
+    @tf.function
     def compute(self, grads, nSteps = 1):
         """Computes fast weights and returns them in an list.
         """
         nLayers = len(self.model.layers)
         return [ weights for j in range(nLayers) for weights in self.__computeKernelAndBias(j, grads, nSteps) ]
 
+    @tf.function
     def apply(self, weights):
         """Apply a set of weights to the model, layer by layer.
         """
-        for j in range(len(self.model.layers)):
-            self.model.layers[j].kernel = weights[j * 2]
-            self.model.layers[j].bias = weights[j * 2 + 1]
+        for j in range(len(self.model.trainable_weights)):
+            
+            self.model.trainable_weights[j].assign(weights[j])
 
+    @tf.function
     def __computeKernelAndBias(self, layerIndex, grads, nSteps):
         """Computes fast weights for a number of steps for one layer.
         """
-        kernel = self.model.layers[layerIndex].kernel
-        bias = self.model.layers[layerIndex].bias
+        kernel = self.model.trainable_weights[layerIndex * 2]#self.model.layers[layerIndex].kernel
+        bias = self.model.trainable_weights[layerIndex * 2 + 1]#self.model.layers[layerIndex].bias
 
         for _ in range(nSteps):
             kernel = kernel - self.lr * grads[layerIndex * 2]
