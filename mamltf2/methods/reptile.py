@@ -1,23 +1,44 @@
 import tensorflow as tf
 from mamltf2.model import Model
 
+
 class RegressionReptile(Model):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.nInnerSteps = 5
+        self.interpolationRate = 1.0
+
+    @tf.function
+    def interpolate(self, source, target):
+        """Linearly interpolate between source and target.
+        """
+        return target + (source - target) * self.interpolationRate
+
+    @tf.function
+    def copyWeightsApply(self, source, target, fn=lambda s, t: s):
+        """Assign weights from source to target. Apply a transform fn to source and target weights first.
+        """
+        for j in range(len(source.trainable_weights)):
+            target.trainable_weights[j].assign(
+                fn(source.trainable_weights[j], target.trainable_weights[j]))
 
     @tf.function
     def taskLoss(self, batch):
         """Computes the loss for one task given one batch of inputs and correspondings labels
         """
-        y_train, x_train = batch
+        y, x = batch
+        self.copyWeightsApply(self.model, self.modelCopy)
 
-        with tf.GradientTape() as taskTape:
-            loss = self.mse(y_train, self.model(
-                tf.reshape(x_train, (-1, 1))))
+        self.interpolationRate *= 0.99
 
-        grads = taskTape.gradient(loss, self.model.trainable_weights)
-        fastWeights = self.fastWeights.compute(grads, nSteps=1)
-        self.fastWeights.apply([weights + self.outerLearningRate * (fastWeights[i] - weights)
-                                for (i, weights) in enumerate(self.model.trainable_weights)])
+        for _ in range(self.nInnerSteps):
+            with tf.GradientTape() as taskTape:
+                loss = self.mse(y, self.modelCopy(tf.reshape(x, (-1, 1))))
 
+            self.sgd.minimize(
+                loss, self.modelCopy.trainable_variables, tape=taskTape)
+
+        self.copyWeightsApply(self.modelCopy, self.model, self.interpolate)
         return loss
 
     @tf.function

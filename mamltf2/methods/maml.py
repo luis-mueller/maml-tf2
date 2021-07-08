@@ -12,8 +12,11 @@ class RegressionMAML(Model):
             loss = self.mse(y_train, self.model(
                 tf.reshape(x_train, (-1, 1))))
 
-        grads = taskTape.gradient(loss, self.weights)
-        return self.mse(y_test, self.fastWeights(grads, x_test))
+        grads = taskTape.gradient(loss, self.model.trainable_weights)
+        weights = self.fastWeights.computeUpdate(zip(grads, self.model.trainable_weights))
+
+        y = self.fastWeights.call(weights, x_test)
+        return self.mse(y_test, y)
 
     @tf.function
     def update(self, batch):
@@ -26,5 +29,5 @@ class RegressionMAML(Model):
             loss = tf.reduce_sum(
                 tf.map_fn(self.taskLoss, elems=batch, fn_output_signature=tf.float32))
 
-        self.optimizer.minimize(loss, self.weights, tape=metaTape)
+        self.optimizer.minimize(loss, self.model.trainable_variables, tape=metaTape)
         return loss

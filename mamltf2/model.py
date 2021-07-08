@@ -8,13 +8,14 @@ class Model:
         """Super class for models in this library: Initializes from disk or from a tensorflow layers model.
         """
         self.model = TensorflowTools.loadModelFromContext(model)
-        self.weights = self.model.trainable_variables
         self.taskDistribution = taskDistribution
 
         self.optimizer = tf.keras.optimizers.Adam(learningRate)
         self.sgd = tf.keras.optimizers.SGD(learningRate)
         self.fastWeights = FastWeights(self.model, 0.01)
         self.mse = tf.keras.losses.MeanSquaredError()
+
+        self.modelCopy = tf.keras.models.clone_model(self.model)
 
     def saveKeras(self, path):
         """Save the model as a keras model.

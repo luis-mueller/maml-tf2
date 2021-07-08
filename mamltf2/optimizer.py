@@ -10,42 +10,15 @@ class FastWeights:
         """
         self.lr = lr
         self.model = model
-    
-    @tf.function
-    def __call__(self, grads, input, nSteps = 1):
-        """Compute fast weights and apply them for a forward pass. It seems that tensorflow 
-        is not able to differentiate through an optimizer's steps, hence this implementation. In the meta-validation step this can 
-        be replaced by a proper tf.keras.optimizers.SGD instance.
-        """
+
+    @tf.function 
+    def call(self, weights, input):
         output = tf.reshape(input, (-1, 1))
         for j in range(len(self.model.layers)):
-            kernel, bias = self.__computeKernelAndBias(j, grads, nSteps)
+            kernel, bias = weights[j * 2], weights[j * 2 + 1]
             output = self.model.layers[j].activation(output @ kernel + bias)
         return output
 
-    @tf.function
-    def compute(self, grads, nSteps = 1):
-        """Computes fast weights and returns them in an list.
-        """
-        nLayers = len(self.model.layers)
-        return [ weights for j in range(nLayers) for weights in self.__computeKernelAndBias(j, grads, nSteps) ]
-
-    @tf.function
-    def apply(self, weights):
-        """Apply a set of weights to the model, layer by layer.
-        """
-        for j in range(len(self.model.trainable_weights)):
-            self.model.trainable_weights[j].assign(weights[j])
-
-    @tf.function
-    def __computeKernelAndBias(self, layerIndex, grads, nSteps):
-        """Computes fast weights for a number of steps for one layer.
-        """
-        kernel = self.model.trainable_weights[layerIndex * 2]
-        bias = self.model.trainable_weights[layerIndex * 2 + 1]
-
-        for _ in range(nSteps):
-            kernel = kernel - self.lr * grads[layerIndex * 2]
-            bias = bias - self.lr * grads[layerIndex * 2 + 1]
-
-        return kernel, bias
+    @tf.function 
+    def computeUpdate(self, grads_and_vars):
+        return [ variable - self.lr * grad for grad, variable in grads_and_vars]
