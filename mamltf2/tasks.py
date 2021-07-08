@@ -28,8 +28,8 @@ class SinusoidRegressionTaskDistribution:
         return SinusoidRegressionTask(A, p)
 
     def sampleTaskBatches(self, nSamples, nTasks, nBatch, sampleLower = -5.0, sampleUpper = 5.0, alsoSampleTest = True):
-        A = tf.random.uniform((nTasks, 1), 0.1, 5.0)
-        p = tf.random.uniform((nTasks, 1), 0, np.pi)
+        A = tf.random.uniform((nBatch, nTasks, 1), 0.1, 5.0)
+        p = tf.random.uniform((nBatch, nTasks, 1), 0, np.pi)
         t = tf.random.uniform((nBatch, nTasks, nSamples), sampleLower, sampleUpper)
         if alsoSampleTest:
             u = tf.random.uniform((nBatch, nTasks, nSamples), sampleLower, sampleUpper)

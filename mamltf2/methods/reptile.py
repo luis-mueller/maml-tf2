@@ -5,8 +5,8 @@ from mamltf2.model import Model
 class RegressionReptile(Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nInnerSteps = 5
-        self.interpolationRate = 1.0
+        self.nInnerSteps = 10
+        self.interpolationRate = 0.2
 
     @tf.function
     def interpolate(self, source, target):
