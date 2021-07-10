@@ -20,7 +20,7 @@ class PretrainedModel(Model):
         with tf.GradientTape() as tape:
             loss = tf.reduce_sum(self.computeTaskLosses(batch))
 
-        self.optimizer.minimize(loss, self.weights, tape=tape)
+        self.optimizer.minimize(loss, self.model.trainable_weights, tape=tape)
         return loss
 
     def trainBatch(self, nSamples, nTasks, nBatch):

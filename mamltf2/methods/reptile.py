@@ -5,8 +5,9 @@ from mamltf2.model import Model
 class RegressionReptile(Model):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nInnerSteps = 10
-        self.interpolationRate = 0.2
+        self.nInnerSteps = 5
+        self.interpolationRate = 0.1
+        self.mysgd = tf.keras.optimizers.SGD(0.02)
 
     @tf.function
     def interpolate(self, source, target):
@@ -29,13 +30,14 @@ class RegressionReptile(Model):
         y, x = batch
         self.copyWeightsApply(self.model, self.modelCopy)
 
-        self.interpolationRate *= 0.99
+        self.interpolationRate *= 0.9999
+        #adam = tf.keras.optimizers.Adam(0.001)
 
         for _ in range(self.nInnerSteps):
             with tf.GradientTape() as taskTape:
                 loss = self.mse(y, self.modelCopy(tf.reshape(x, (-1, 1))))
 
-            self.sgd.minimize(
+            self.mysgd.minimize(
                 loss, self.modelCopy.trainable_variables, tape=taskTape)
 
         self.copyWeightsApply(self.modelCopy, self.model, self.interpolate)
