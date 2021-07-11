@@ -17,7 +17,7 @@ python3 run.py maml-reproduce maml --epochs=70 --batch-size=1000 --training-task
 To visualize the model on a randomly sampled task by comparing predicitions for 0, 1 and 10 gradient steps with `K = 10` you can run:
 
 ```
-python3 visualize.py maml-reproduce maml 0 1 10 --samples=10
+python3 visualize.py maml-reproduce 0 1 10 --samples=10
 ```
 
 ## Getting Started
@@ -26,7 +26,7 @@ The codebase can be used in two ways: To conduct experiments using the `run.py` 
 ```python
 import tensorflow as tf
 import tensorflowjs as tfjs
-from mamltf2 import RegressionMAML, SinusoidRegressionTaskDistribution
+from mamltf2 import MAML, SinusoidRegressionTaskDistribution
 
 ann = tf.keras.models.Sequential([
     tf.keras.layers.Dense(40, activation='relu', input_shape=(1,)),
@@ -35,7 +35,7 @@ ann = tf.keras.models.Sequential([
 ])
 
 taskDistribution = SinusoidRegressionTaskDistribution()
-maml = RegressionMAML(ann, taskDistribution)
+maml = MAML(ann, taskDistribution)
 
 # Trains a batch of 1000 iterations with 10 task samples each, distributed over 25 tasks
 maml.trainBatch(nSamples = 10, nTasks = 25, nBatch = 1000)
@@ -59,7 +59,7 @@ maml.saveKeras('/path/to/destination/')
 and load it again via
 
 ```python
-maml = RegressionMAML('/path/to/destination/', taskDistribution)
+maml = MAML('/path/to/destination/', taskDistribution)
 ```
 
 which stores the actual `tensorflow` model in `maml.metaModel`. However, the format makes it also possible to load the model directly in the browser, via e.g. in `node`:
