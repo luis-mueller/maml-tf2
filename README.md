@@ -59,7 +59,7 @@ maml.saveKeras('/path/to/destination/')
 and load it again via
 
 ```python
-maml = RegressionMAML('/path/to/destination/', taskDistribution)
+maml = MAML('/path/to/destination/', taskDistribution)
 ```
 
 which stores the actual `tensorflow` model in `maml.metaModel`. However, the format makes it also possible to load the model directly in the browser, via e.g. in `node`:
