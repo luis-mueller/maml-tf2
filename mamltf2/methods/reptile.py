@@ -1,13 +1,13 @@
 import tensorflow as tf
 from mamltf2.model import Model
 
-
-class RegressionReptile(Model):
-    def __init__(self, *args, **kwargs):
+class Reptile(Model):
+    def __init__(self, *args, nInnerSteps = 5, **kwargs):
         super().__init__(*args, **kwargs)
-        self.nInnerSteps = 5
-        self.interpolationRate = 0.1
-        self.mysgd = tf.keras.optimizers.SGD(0.02)
+        self.nInnerSteps = nInnerSteps
+        self.interpolationRateInitial = self.outerLearningRate
+        self.sgd = tf.keras.optimizers.SGD(self.innerLearningRate)
+        self.modelCopy = tf.keras.models.clone_model(self.model)
 
     @tf.function
     def interpolate(self, source, target):
@@ -23,6 +23,11 @@ class RegressionReptile(Model):
             target.trainable_weights[j].assign(
                 fn(source.trainable_weights[j], target.trainable_weights[j]))
 
+    @tf.function 
+    def updateInterpolationRate(self):
+        self.interpolationRate = self.interpolationRateInitial * (1 - self.nIteration / self.nIterations)
+        self.nIteration += 1
+
     @tf.function
     def taskLoss(self, batch):
         """Computes the loss for one task given one batch of inputs and correspondings labels
@@ -30,14 +35,13 @@ class RegressionReptile(Model):
         y, x = batch
         self.copyWeightsApply(self.model, self.modelCopy)
 
-        self.interpolationRate *= 0.9999
-        #adam = tf.keras.optimizers.Adam(0.001)
+        self.updateInterpolationRate()
 
         for _ in range(self.nInnerSteps):
             with tf.GradientTape() as taskTape:
-                loss = self.mse(y, self.modelCopy(tf.reshape(x, (-1, 1))))
+                loss = self.lossfn(y, self.modelCopy(tf.reshape(x, (-1, 1))))
 
-            self.mysgd.minimize(
+            self.sgd.minimize(
                 loss, self.modelCopy.trainable_variables, tape=taskTape)
 
         self.copyWeightsApply(self.modelCopy, self.model, self.interpolate)
@@ -54,4 +58,8 @@ class RegressionReptile(Model):
             tf.map_fn(self.taskLoss, elems=batch, fn_output_signature=tf.float32))
 
     def trainBatch(self, nSamples, nTasks, nBatch):
+        self.nIterations = nBatch 
+        self.nIteration = 0
+        self.innerLearningRate = self.interpolationRateInitial
+
         return super().trainBatch(nSamples, nTasks, nBatch, alsoSampleTest=False)

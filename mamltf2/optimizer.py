@@ -12,7 +12,7 @@ class FastWeights:
         self.model = model
 
     @tf.function 
-    def call(self, weights, input):
+    def __call__(self, weights, input):
         output = tf.reshape(input, (-1, 1))
         for j in range(len(self.model.layers)):
             kernel, bias = weights[j * 2], weights[j * 2 + 1]

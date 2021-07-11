@@ -1,42 +1,30 @@
-from mamltf2.optimizer import FastWeights
 import tensorflow as tf
-from mamltf2.tftools import TensorflowTools
-from mamltf2.optimizer import FastWeights
+from mamltf2.deployable import DeployableModel
 
-class Model:
-    def __init__(self, model, taskDistribution, learningRate=0.001):
+
+class Model(DeployableModel):
+    def __init__(self, model, taskDistribution, lossfn='mse', outerLearningRate=0.001, innerLearningRate=0.01):
         """Super class for models in this library: Initializes from disk or from a tensorflow layers model.
         """
-        self.model = TensorflowTools.loadModelFromContext(model)
+        super().__init__(model)
+
+        self.outerLearningRate = outerLearningRate
+        self.innerLearningRate = innerLearningRate
+
         self.taskDistribution = taskDistribution
+        self.lossfn = tf.keras.losses.MeanSquaredError() if lossfn == 'mse' else lossfn
 
-        self.optimizer = tf.keras.optimizers.Adam(learningRate)
-        self.sgd = tf.keras.optimizers.SGD(learningRate)
-        self.fastWeights = FastWeights(self.model, 0.01)
-        self.mse = tf.keras.losses.MeanSquaredError()
-
-        self.modelCopy = tf.keras.models.clone_model(self.model)
-
-    def saveKeras(self, path):
-        """Save the model as a keras model.
-        """
-        TensorflowTools.saveKeras(self.model, path)
-
-    def steps(self, y, x, nSteps=1):
+    def fit(self, y, x, nSteps=1):
         """For meta-validation: Take a fixed number of gradient steps for the loss given y and x.
         """
-        clone = TensorflowTools.deepCloneModel(self.model)
-        self.fitClone(clone, y, x, nSteps)
-        return clone
-
-    def fitClone(self, clone, y, x, nSteps):
-        """Does the actual model fitting with a simple step-size.
-        """
+        clone = self.__deepCloneModel(self.model)
+        optimizer = tf.keras.optimizers.SGD(self.innerLearningRate)
         for _ in range(nSteps):
-            with tf.GradientTape() as taskTape:
-                loss = self.mse(y, clone(x))
+            with tf.GradientTape() as tape:
+                loss = self.lossfn(y, clone(x))
 
-            tf.keras.optimizers.SGD(0.01).minimize(loss, clone.trainable_weights, tape = taskTape)
+            optimizer.minimize(loss, clone.trainable_weights, tape=tape)
+        return clone
 
     def trainBatch(self, nSamples, nTasks, nBatch, alsoSampleTest=True):
         """Utility method to train an entire episode/epoch in one go, sampling the entire data at once.
@@ -47,3 +35,8 @@ class Model:
 
         return float(tf.reduce_mean(tf.map_fn(lambda batch: self.update(
             batch), elems=batch, fn_output_signature=tf.float32) / nTasks))
+
+    def __deepCloneModel(self, model):
+        clone = tf.keras.models.clone_model(model)
+        clone.set_weights(model.get_weights())
+        return clone

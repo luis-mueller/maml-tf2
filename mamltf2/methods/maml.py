@@ -1,7 +1,16 @@
 import tensorflow as tf
 from mamltf2.model import Model
+from mamltf2.optimizer import FastWeights
 
-class RegressionMAML(Model):
+class MAML(Model):
+    def __init__(self, *args, **kwargs):
+        """ Implementation of MAML (Finn et al. 2017).
+        """
+        super().__init__(*args, **kwargs)
+
+        self.optimizer = tf.keras.optimizers.Adam(self.outerLearningRate)
+        self.fastWeights = FastWeights(self.model, self.innerLearningRate)
+
     @tf.function
     def taskLoss(self, batch):
         """Computes the loss for one task given one batch of inputs and correspondings labels
@@ -9,14 +18,13 @@ class RegressionMAML(Model):
         y_train, x_train, y_test, x_test = batch
 
         with tf.GradientTape() as taskTape:
-            loss = self.mse(y_train, self.model(
+            loss = self.lossfn(y_train, self.model(
                 tf.reshape(x_train, (-1, 1))))
 
         grads = taskTape.gradient(loss, self.model.trainable_weights)
         weights = self.fastWeights.computeUpdate(zip(grads, self.model.trainable_weights))
 
-        y = self.fastWeights.call(weights, x_test)
-        return self.mse(y_test, y)
+        return self.lossfn(y_test, self.fastWeights(weights, x_test))
 
     @tf.function
     def update(self, batch):
