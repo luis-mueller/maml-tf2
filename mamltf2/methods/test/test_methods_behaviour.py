@@ -36,7 +36,7 @@ class TestMethodBehaviour(unittest.TestCase):
                      outerLearningRate=0.001, innerLearningRate=0.01)
         
         loss = self.doTraining('maml', model, 3, 10, 5, 1000)
-        self.assertLessEqual(loss, 1.0)
+        self.assertLessEqual(loss, 1.2)
 
     def test_fomaml_convbehav(self):
         model = FirstOrderMAML(self.model, self.taskDistribution, lossfn='mse',
