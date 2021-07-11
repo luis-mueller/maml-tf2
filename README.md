@@ -17,7 +17,7 @@ python3 run.py maml-reproduce maml --epochs=70 --batch-size=1000 --training-task
 To visualize the model on a randomly sampled task by comparing predicitions for 0, 1 and 10 gradient steps with `K = 10` you can run:
 
 ```
-python3 visualize.py maml-reproduce maml 0 1 10 --samples=10
+python3 visualize.py maml-reproduce 0 1 10 --samples=10
 ```
 
 ## Getting Started
