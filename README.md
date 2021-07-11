@@ -71,3 +71,6 @@ load = async () => {
     const model = await tf.loadLayersModel('https://path/to/destintation/model.json');
 }
 ```
+
+## Contribute:
+See how to contribute [here](https://github.com/pupuis/maml-tf2/blob/main/doc/CONTRIBUTING.md).
