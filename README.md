@@ -11,7 +11,7 @@ The actual algorithm comprises only roughly 60 loc and uses a straightforward in
 The codebase comes with two scripts (`run.py` and `visualize.py`) which, apart from serving as examples of use, provide a CLI to train and visualize MAML, e.g. train a model with different parameters or comparing a different number of fine-tuning steps in meta-validation. Models are persisted during training and can be loaded during meta-validation/visualization via the `keras` model interface provided by `tensorflowjs`. This has the benefit of producing models that can be loaded directly both in `python` and `javascript`. To reproduce e.g. the experiments from Finn et al. 2017 you can run the following command, which will run for a total of 70000 iterations, distributed over 70 epochs, such that you receive an average loss every 1000 iterations:
 
 ```
-python3 run.py maml-reproduce maml --epochs=70 --batch-size=1000 --training-tasks=25 --task-sample=10
+python3 run.py maml-reproduce maml --epochs=70 --batches=1000 --tasks=25 --samples=10
 ```
 
 To visualize the model on a randomly sampled task by comparing predicitions for 0, 1 and 10 gradient steps with `K = 10` you can run:
