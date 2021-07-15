@@ -1,5 +1,5 @@
 import tensorflow as tf
-from mamltf2 import MAML, FirstOrderMAML, Reptile, PretrainedModel, SinusoidRegressionTaskDistribution
+from mamltf2 import MAML, FirstOrderMAML, Reptile, IMAML, PretrainedModel, SinusoidRegressionTaskDistribution
 import argparse
 
 
@@ -23,6 +23,8 @@ def main(name, method, batches, tasks, samples, epochs, larger_network, save_pre
         metaModel = FirstOrderMAML(model, taskDistribution)
     elif method == 'reptile':
         metaModel = Reptile(model, taskDistribution, outerLearningRate = 0.1, innerLearningRate = 0.02)
+    elif method == 'imaml':
+        metaModel = IMAML(model, taskDistribution, outerLearningRate = 0.1, innerLearningRate = 0.001)
     elif method == 'pretrained':
         metaModel = PretrainedModel(model, taskDistribution)
     else:
