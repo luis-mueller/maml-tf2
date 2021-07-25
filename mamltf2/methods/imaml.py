@@ -5,13 +5,13 @@ from mamltf2.model import Model
 @tf.function
 def add_mul(a, b, s=1):
     """Computes a + s*b for lists of tensors a and b and scalar s."""
-    return [ai + s*bi for ai, bi in zip(a, b)]
+    return [ai + tf.multiply(s, bi) for ai, bi in zip(a, b)]
 
 @tf.function
 def dot(a, b):
     return tf.reduce_sum([tf.reduce_sum(tf.multiply(ai, bi)) for ai, bi in zip(a, b)])
 
-
+@tf.function
 def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
     """ Implements basic conjugate gradient method.
         @operator: function, should return the product of A and v
@@ -21,12 +21,14 @@ def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
     x = [tf.zeros_like(bi) for bi in b]  # starting point
 
 
-    r = [bi - ox_i for bi, ox_i in zip(b, operator(x))]  # residual
+    r = [bi - oxi for bi, oxi in zip(b, operator(x))]  # residual
     p = [tf.identity(ri) for ri in r]  # search direction
     r_dot_r = dot(r, r)
 
+
     for _ in tf.range(max_iterations):
         Ap = operator(p)
+
         alpha = r_dot_r / dot(p, Ap)
 
         # update x and residual
@@ -34,7 +36,7 @@ def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
         x = add_mul(x, p, alpha)
 
         # r = r + Ap * alpha
-        r = add_mul(r, Ap, alpha)
+        r = add_mul(r, Ap, -alpha)
 
         r_dot_r_new = dot(r, r)
 
@@ -56,7 +58,7 @@ def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
 
 
 class IMAML(Model):
-    def __init__(self, *args, nInnerSteps = 5, regularizationCoeffiecient=0.01, **kwargs):
+    def __init__(self, *args, nInnerSteps = 5, regularizationCoeffiecient=2, **kwargs):
         super().__init__(*args, **kwargs)
         self.nInnerSteps = nInnerSteps
         self.innerOptimizer = tf.keras.optimizers.SGD(self.innerLearningRate)
@@ -99,6 +101,7 @@ class IMAML(Model):
         return loss
 
     def create_operator(self, x, y):
+        @tf.function
         def operator(v):
             return v + [h/self.regularizationCoeffiecient for h in self.hessian_vector_product(x, y, v)]
         return operator
@@ -113,7 +116,7 @@ class IMAML(Model):
             grads = inner_tape.gradient(loss, variables)
         return outer_tape.gradient(grads, variables, output_gradients=v)
 
-    #@tf.function
+    @tf.function
     def update(self, batch):
         """Implements the meta-update step for a bunch of tasks.
 
@@ -134,14 +137,12 @@ class IMAML(Model):
                 test_loss = self.calcLoss(x_test, y_test)
             test_loss_gradient = tape.gradient(test_loss, self.modelCopy.trainable_variables)
 
-
-            print(test_loss)
-
             lossSum += test_loss
 
             metaGradients.append(conjugate_gradient(
                 operator=self.create_operator(x_train, y_train),
-                b=test_loss_gradient
+                b=test_loss_gradient,
+                max_iterations=5
             ))
 
         metaGradient = [tf.reduce_mean(grads, axis=0) for grads in zip(*metaGradients)]
