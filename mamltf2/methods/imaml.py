@@ -1,53 +1,51 @@
 import tensorflow as tf
 from mamltf2.model import Model
 
-
 @tf.function
 def add_mul(a, b, s=1):
-    """Computes a + s*b for lists of tensors a and b and scalar s."""
-    return [ai + tf.multiply(s, bi) for ai, bi in zip(a, b)]
+    return [a[i] + s*b[i] for i in range(len(a))]
 
 @tf.function
 def dot(a, b):
     return tf.reduce_sum([tf.reduce_sum(tf.multiply(ai, bi)) for ai, bi in zip(a, b)])
 
-@tf.function
-def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
+
+def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20, operator_kwargs={}):
     """ Implements basic conjugate gradient method.
         @operator: function, should return the product of A and v
         @b: target value (right-hand side)
     """
 
-    x = [tf.zeros_like(bi) for bi in b]  # starting point
+    x = tf.zeros_like(b)  # starting point
+    r = add_mul(b, operator(x, **operator_kwargs), -1.0)  # residual
 
-
-    r = [bi - oxi for bi, oxi in zip(b, operator(x))]  # residual
     p = [tf.identity(ri) for ri in r]  # search direction
+
     r_dot_r = dot(r, r)
 
+    for i in tf.range(max_iterations):
 
-    for _ in tf.range(max_iterations):
-        Ap = operator(p)
+        Ap = operator(p, **operator_kwargs)
 
         alpha = r_dot_r / dot(p, Ap)
 
         # update x and residual
-        #x = x + p * alpha
+        #x = x + alpha*p
         x = add_mul(x, p, alpha)
 
-        # r = r + Ap * alpha
+        #r = r - alpha*Ap
         r = add_mul(r, Ap, -alpha)
 
         r_dot_r_new = dot(r, r)
 
         # stopping condition
-        if tf.less(r_dot_r_new, tolerance): break
+        #if tf.less(r_dot_r_new, tolerance): break
 
         # prepare for next iteration
         beta = r_dot_r_new / r_dot_r
 
         # update search direction
-        # p = r + p * beta
+        #p = r + beta * p
         p = add_mul(r, p, beta)
 
         r_dot_r = r_dot_r_new  # shortcut for next iteration
@@ -56,36 +54,79 @@ def conjugate_gradient(operator, b, tolerance=1e-05, max_iterations=20):
 
 
 
+def line_search(operator, b, max_iterations=20, operator_kwargs={}):
+    # starting point
+    x = [tf.zeros_like(bi) for bi in b]
+
+    Ax = operator(x, **operator_kwargs)
+
+    # residual
+    r = add_mul(b, Ax, -1.0)
+
+    for i in range(max_iterations):
+        r_dot_r = dot(r, r)
+        Ar = operator(r, **operator_kwargs)
+        rAr = dot(r, Ar)
+        if tf.less(rAr, 1e-7): break
+        alpha = r_dot_r / rAr
+
+        #x = x + alpha*r
+        x = add_mul(x, r, alpha)
+
+        #r = r - alpha*Ar
+        r = add_mul(r, Ar, -alpha)
+
+    return x
+
+
 
 class IMAML(Model):
-    def __init__(self, *args, nInnerSteps = 5, regularizationCoeffiecient=2, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self, *args,
+                 nInnerSteps = 5,
+                 regularizationCoeffiecient=2,
+                 solverSteps=5,
+                 outerLearningRate = 0.2,
+                 innerLearningRate = 0.02,
+                 **kwargs):
+
+        super().__init__(*args, outerLearningRate=outerLearningRate, innerLearningRate=innerLearningRate, **kwargs)
         self.nInnerSteps = nInnerSteps
+        self.solverSteps = solverSteps
         self.innerOptimizer = tf.keras.optimizers.SGD(self.innerLearningRate)
         self.outerOptimizer = tf.keras.optimizers.SGD(self.outerLearningRate)
-        self.modelCopy = tf.keras.models.clone_model(self.model)
+
+        self.model.theta = [
+            tf.Variable(tf.zeros_like(variable), trainable=False, name="theta")
+            for variable in self.model.trainable_variables
+        ]
+
         self.regularizer = tf.keras.regularizers.L2(regularizationCoeffiecient)
         self.regularizationCoeffiecient = regularizationCoeffiecient
 
     @tf.function
     def regularizationLoss(self):
-        loss = 0
-        for metaParam, taskParam in zip(self.model.trainable_weights,
-                                        self.modelCopy.trainable_weights):
-            loss += self.regularizer(taskParam-metaParam)
-        return loss
+        return self.regularizationCoeffiecient * tf.reduce_sum([
+            tf.reduce_sum((phi - theta)**2)
+            for phi, theta in zip(self.model.trainable_weights, self.model.theta)
+        ])
 
-    @tf.function
-    def initializeTaskParams(self):
-        for metaParam, taskParam in zip(self.model.trainable_weights,
-                                        self.modelCopy.trainable_weights):
-            taskParam.assign(metaParam)
+    def theta_to_phi(self):
+        """ Initialize parameters with theta."""
+        for i in range(len(self.model.trainable_weights)):
+            self.model.trainable_weights[i].assign(self.model.theta[i])
+
+
+    def theta_from_phi(self):
+        """ Set theta from current model parameters. This is useful for applying
+            an optimizer to theta."""
+        for i in range(len(self.model.trainable_weights)):
+            self.model.theta[i].assign(self.model.trainable_weights[i])
+
 
     @tf.function
     def calcLoss(self, x, y):
-        y_pred = self.modelCopy(tf.reshape(x, (-1, 1)))
+        y_pred = self.model(tf.reshape(x, (-1, 1)))
         loss = self.lossfn(y, y_pred)
-
         return loss
 
     @tf.function
@@ -96,27 +137,24 @@ class IMAML(Model):
                 regularizedLoss = loss + self.regularizationLoss()
 
             self.innerOptimizer.minimize(
-                regularizedLoss, self.modelCopy.trainable_variables, tape=taskTape)
+                regularizedLoss, self.model.trainable_variables, tape=taskTape)
 
         return loss
 
-    def create_operator(self, x, y):
-        @tf.function
-        def operator(v):
-            return v + [h/self.regularizationCoeffiecient for h in self.hessian_vector_product(x, y, v)]
-        return operator
+    @tf.function
+    def cg_operator(self, v, x, y):
+        return add_mul(add_mul(v, v), self.hessian_vector_product(x, y, v), 1/self.regularizationCoeffiecient)
 
     @tf.function
     def hessian_vector_product(self, x, y, v):
-        variables = self.modelCopy.trainable_variables
+        vars = self.model.trainable_variables
 
         with tf.GradientTape() as outer_tape:
             with tf.GradientTape() as inner_tape:
                 loss = self.calcLoss(x, y)
-            grads = inner_tape.gradient(loss, variables)
-        return outer_tape.gradient(grads, variables, output_gradients=v)
+            grads = inner_tape.gradient(loss, vars)
+        return outer_tape.gradient(grads, vars, output_gradients=v)
 
-    @tf.function
     def update(self, batch):
         """Implements the meta-update step for a bunch of tasks.
 
@@ -124,32 +162,51 @@ class IMAML(Model):
         the task updates.
         """
 
+        self.theta_from_phi()
+
         metaGradients = list()
         lossSum = 0
 
         for y_train, x_train, y_test, x_test in zip(*(tf.unstack(x) for x in batch)):
             # copy meta parameter to fast adapting model
-            self.initializeTaskParams()
+            self.theta_to_phi()
 
             self.trainOnSamples(x_train, y_train)
 
             with tf.GradientTape() as tape:
                 test_loss = self.calcLoss(x_test, y_test)
-            test_loss_gradient = tape.gradient(test_loss, self.modelCopy.trainable_variables)
+            test_loss_gradient = tape.gradient(test_loss, self.model.trainable_variables)
 
             lossSum += test_loss
 
-            metaGradients.append(conjugate_gradient(
-                operator=self.create_operator(x_train, y_train),
+            if tf.reduce_any(tf.math.is_nan(test_loss)):
+                tf.print("test loss has nan")
+                quit()
+
+            #grad = conjugate_gradient(
+            grad = line_search(
+                operator=self.cg_operator,
+                operator_kwargs=dict(x=x_train, y=y_train),
                 b=test_loss_gradient,
-                max_iterations=5
-            ))
+                max_iterations=self.solverSteps
+            )
+
+            if tf.reduce_any([tf.reduce_any(tf.math.is_nan(g)) for g in grad]):
+                tf.print("grad has nan", grad)
+                quit()
+
+            metaGradients.append(grad)
 
         metaGradient = [tf.reduce_mean(grads, axis=0) for grads in zip(*metaGradients)]
 
+
         # Apply gradient
+
+        self.theta_to_phi()
+
         self.outerOptimizer.apply_gradients(
             list(zip(metaGradient, self.model.trainable_weights))
         )
+
 
         return lossSum

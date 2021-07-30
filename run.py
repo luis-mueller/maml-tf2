@@ -24,7 +24,7 @@ def main(name, method, batches, tasks, samples, epochs, larger_network, save_pre
     elif method == 'reptile':
         metaModel = Reptile(model, taskDistribution, outerLearningRate = 0.1, innerLearningRate = 0.02)
     elif method == 'imaml':
-        metaModel = IMAML(model, taskDistribution, outerLearningRate = 0.1, innerLearningRate = 0.001)
+        metaModel = IMAML(model, taskDistribution)
     elif method == 'pretrained':
         metaModel = PretrainedModel(model, taskDistribution)
     else:
