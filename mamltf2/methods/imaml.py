@@ -84,9 +84,9 @@ class IMAML(Model):
     def __init__(self, *args,
                  nInnerSteps = 5,
                  regularizationCoeffiecient=2,
-                 solverSteps=5,
-                 outerLearningRate = 0.2,
-                 innerLearningRate = 0.02,
+                 solverSteps=20,
+                 outerLearningRate = 0.01,
+                 innerLearningRate = 0.001,
                  **kwargs):
 
         super().__init__(*args, outerLearningRate=outerLearningRate, innerLearningRate=innerLearningRate, **kwargs)
@@ -97,7 +97,7 @@ class IMAML(Model):
 
         self.model.theta = [
             tf.Variable(tf.zeros_like(variable), trainable=False, name="theta")
-            for variable in self.model.trainable_variables
+            for variable in self.model.trainable_weights
         ]
 
         self.regularizer = tf.keras.regularizers.L2(regularizationCoeffiecient)
@@ -137,20 +137,21 @@ class IMAML(Model):
                 regularizedLoss = loss + self.regularizationLoss()
 
             self.innerOptimizer.minimize(
-                regularizedLoss, self.model.trainable_variables, tape=taskTape)
+                regularizedLoss, self.model.trainable_weights, tape=taskTape)
 
         return loss
 
     @tf.function
     def cg_operator(self, v, x, y):
-        return add_mul(add_mul(v, v), self.hessian_vector_product(x, y, v), 1/self.regularizationCoeffiecient)
+        return add_mul(v, self.hessian_vector_product(x, y, v), 1/self.regularizationCoeffiecient)
 
     @tf.function
     def hessian_vector_product(self, x, y, v):
-        vars = self.model.trainable_variables
+        vars = self.model.trainable_weights
 
         with tf.GradientTape() as outer_tape:
             with tf.GradientTape() as inner_tape:
+                #loss = self.regularizationLoss()
                 loss = self.calcLoss(x, y)
             grads = inner_tape.gradient(loss, vars)
         return outer_tape.gradient(grads, vars, output_gradients=v)
@@ -164,24 +165,21 @@ class IMAML(Model):
 
         self.theta_from_phi()
 
-        metaGradients = list()
+        metaGradient = list()
         lossSum = 0
 
         for y_train, x_train, y_test, x_test in zip(*(tf.unstack(x) for x in batch)):
             # copy meta parameter to fast adapting model
             self.theta_to_phi()
 
+
             self.trainOnSamples(x_train, y_train)
 
             with tf.GradientTape() as tape:
                 test_loss = self.calcLoss(x_test, y_test)
-            test_loss_gradient = tape.gradient(test_loss, self.model.trainable_variables)
+            test_loss_gradient = tape.gradient(test_loss, self.model.trainable_weights)
 
             lossSum += test_loss
-
-            if tf.reduce_any(tf.math.is_nan(test_loss)):
-                tf.print("test loss has nan")
-                quit()
 
             #grad = conjugate_gradient(
             grad = line_search(
@@ -191,13 +189,10 @@ class IMAML(Model):
                 max_iterations=self.solverSteps
             )
 
-            if tf.reduce_any([tf.reduce_any(tf.math.is_nan(g)) for g in grad]):
-                tf.print("grad has nan", grad)
-                quit()
+            metaGradient.append(grad)
 
-            metaGradients.append(grad)
 
-        metaGradient = [tf.reduce_mean(grads, axis=0) for grads in zip(*metaGradients)]
+        metaGradient = [tf.reduce_mean(grads, axis=0) for grads in zip(*metaGradient)]
 
 
         # Apply gradient
